@@ -40,19 +40,20 @@ static void * kMainQueueKey = (void *) "Key1";
 }
 
 -(void) saveToStore {
+//    [self saveWithPromise];
     [self saveWithPromise].then(^id(id success) {
-        return [self save:_privateMoc];
+        return [self save:self->_privateMoc];
     }, Nil);
 }
 
 -(RXPromise *) saveWithPromise {
-    return [RXPromise all:@[[self save:_moc], [self save:_backgrondMoc]]];
+    return [RXPromise all:@[[self save:_moc]]];
 }
 
 -(RXPromise *) save: (NSManagedObjectContext *) context {
     RXPromise * promise = [RXPromise new];
-    
-    [context performBlock:^{
+        
+    [context performBlock:^{        
         @try {
             if (context.hasChanges) {
                 NSError *error = nil;
@@ -73,7 +74,9 @@ static void * kMainQueueKey = (void *) "Key1";
 }
 
 -(RXPromise *) save {
-    return [self saveWithPromise];
+    return [self saveWithPromise].then(^id(id success) {
+        return [self save:self->_privateMoc];
+    }, Nil);
 }
 
 -(NSArray *) fetchEntitiesWithName: (NSString *) entityName {
@@ -134,9 +137,9 @@ static void * kMainQueueKey = (void *) "Key1";
     return Nil;
 }
 
--(RXPromise *) performOnPrivate: (id (^)(void))block  {
-    return [self performOn:self.backgroundManagedObjectContext withBlock:block];
-}
+//-(RXPromise *) performOnPrivate: (id (^)(void))block  {
+//    return [self performOn:self.backgroundManagedObjectContext withBlock:block];
+//}
 
 -(RXPromise *) performOnMain: (id(^)(void)) block  {
     return [self performOn:self.managedObjectContext withBlock:block];
@@ -215,20 +218,6 @@ static void * kMainQueueKey = (void *) "Key1";
     return _privateMoc;
 }
 
-- (NSManagedObjectContext *) backgroundManagedObjectContext {
-    
-    if (!_backgrondMoc) {
-        _backgrondMoc = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSPrivateQueueConcurrencyType];
-        _backgrondMoc.parentContext = self.managedObjectContext;
-        
-        NSUndoManager *undoManager = [[NSUndoManager alloc] init];
-        [_backgrondMoc setUndoManager:undoManager];
-        [_backgrondMoc setAutomaticallyMergesChangesFromParent:YES];
-    }
-    
-    return _backgrondMoc;
-}
-
 - (NSManagedObjectContext *) managedObjectContext {
     
     if (!_moc) {
@@ -236,7 +225,9 @@ static void * kMainQueueKey = (void *) "Key1";
         _moc.parentContext = self.privateManagedObjectContext;
         NSUndoManager *undoManager = [[NSUndoManager alloc] init];
         [_moc setUndoManager:undoManager];
-        //        [_moc setAutomaticallyMergesChangesFromParent:YES];
+//        if (@available(iOS 10.0, *)) {
+//            [_moc setAutomaticallyMergesChangesFromParent:YES];
+//        }
     }
     return _moc;
 }
@@ -270,7 +261,6 @@ static void * kMainQueueKey = (void *) "Key1";
         NSString * path = [bundle pathForResource:@"ChatSDK" ofType:@"momd"];
         NSURL * momURL = [NSURL fileURLWithPath:path];
         _model = [[NSManagedObjectModel alloc] initWithContentsOfURL:momURL];
-        
     }
     
     return _model;
@@ -279,7 +269,7 @@ static void * kMainQueueKey = (void *) "Key1";
 - (NSPersistentStoreCoordinator *)persistentStoreCoordinator {
     if (!_store) {
         NSURL *storeUrl = [NSURL fileURLWithPath: [[self applicationDocumentsDirectory]
-                                                   stringByAppendingPathComponent: @"ChatSDK.sqlite"]];
+                                                   stringByAppendingPathComponent: @"bework.sqlite"]];
         
         NSError *error = nil;
         _store = [[NSPersistentStoreCoordinator alloc]
@@ -406,21 +396,27 @@ static void * kMainQueueKey = (void *) "Key1";
     return messages;
 }
 
+- (RXPromise *)performOnPrivate:(id (^)(void))block {
+    RXPromise* promise = [RXPromise new];
+    return promise;
+}
+
+
 /// https://stackoverflow.com/questions/36338135/nsmanagedobjectcontext-how-to-update-child-when-parent-changes
 /// I need this firing as sometimes objects change and the save notification below is not enough to make sure the UI updates.
 - (void)privateQueueObjectContextDidChangeNotification:(NSNotification *)notification {
     NSManagedObjectContext * context = notification.object;
     
     NSManagedObjectContext * parent = self.privateManagedObjectContext;
-    NSManagedObjectContext * background = self.backgroundManagedObjectContext;
+//    NSManagedObjectContext * background = self.backgroundManagedObjectContext;
     NSManagedObjectContext * main = self.managedObjectContext;
 
     if([context isEqual:parent]) {
 //        NSLog(@"Parent");
     }
-    else if([context isEqual:background]) {
+//    else if([context isEqual:background]) {
 //        NSLog(@"Background");
-    }
+//    }
     else if([context isEqual:main]) {
 //        NSLog(@"Main");
     }
